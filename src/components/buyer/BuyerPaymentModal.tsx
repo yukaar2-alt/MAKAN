@@ -1,7 +1,15 @@
 import React, { useState, useEffect } from "react";
-import { GoogleUser, CartItem } from "../../types";
+import { GoogleUser, CartItem, PaymentQRConfig } from "../../types";
 import { formatRupiah } from "../../utils/export";
-import { generateQRISPayload, generateQRCodeDataUrl, MERCHANT_NAME, MERCHANT_NMID } from "../../utils/qris";
+import {
+  generateQRISPayload,
+  generateQRCodeDataUrl,
+  MERCHANT_NAME,
+  MERCHANT_NMID,
+  MERCHANT_A01,
+  MERCHANT_PRINTER_CODE,
+  QRIS_STAND_PHOTO,
+} from "../../utils/qris";
 import {
   QrCode,
   Upload,
@@ -18,6 +26,8 @@ import {
   ChevronUp,
   Receipt,
   Sparkles,
+  ZoomIn,
+  Eye,
 } from "lucide-react";
 
 interface BuyerPaymentModalProps {
@@ -25,6 +35,7 @@ interface BuyerPaymentModalProps {
   cartItems: CartItem[];
   orderType: "dine_in" | "take_away";
   tableNumber?: string;
+  paymentQRConfig?: PaymentQRConfig | null;
   onClose: () => void;
   onSubmitOrder: (orderData: {
     customerId: string;
@@ -44,6 +55,7 @@ export const BuyerPaymentModal: React.FC<BuyerPaymentModalProps> = ({
   cartItems,
   orderType,
   tableNumber,
+  paymentQRConfig,
   onClose,
   onSubmitOrder,
 }) => {
@@ -56,13 +68,22 @@ export const BuyerPaymentModal: React.FC<BuyerPaymentModalProps> = ({
   const [isCopied, setIsCopied] = useState<boolean>(false);
   const [showOrderDetails, setShowOrderDetails] = useState<boolean>(false);
   const [timeLeft, setTimeLeft] = useState<number>(900); // 15 minutes in seconds
+  const [isZoomed, setIsZoomed] = useState<boolean>(false);
+
+  // Active QR parameters configured by cashier
+  const activeQrImage = paymentQRConfig?.imageUrl || QRIS_STAND_PHOTO;
+  const activeMerchantName = paymentQRConfig?.merchantName || MERCHANT_NAME;
+  const activeNmid = paymentQRConfig?.nmid || MERCHANT_NMID;
+  const activeTerminal = paymentQRConfig?.terminal || MERCHANT_A01;
+  const activePrinterCode = paymentQRConfig?.printerCode || MERCHANT_PRINTER_CODE;
+  const shouldUseCustomImage = paymentQRConfig ? paymentQRConfig.useCustomImage !== false : true;
 
   const totalAmount = cartItems.reduce(
     (sum, item) => sum + item.product.price * item.quantity,
     0
   );
 
-  // Generate real QR code image for this specific amount
+  // Generate real dynamic QR code image for this specific amount
   useEffect(() => {
     const tempOrderNumber = "ORD-" + Math.floor(100000 + Math.random() * 900000);
     const payload = generateQRISPayload(totalAmount, tempOrderNumber);
@@ -90,10 +111,9 @@ export const BuyerPaymentModal: React.FC<BuyerPaymentModalProps> = ({
   };
 
   const handleDownloadQR = () => {
-    if (!qrDataUrl) return;
     const a = document.createElement("a");
-    a.href = qrDataUrl;
-    a.download = `QRIS-Pembayaran-${totalAmount}.png`;
+    a.href = shouldUseCustomImage ? activeQrImage : (qrDataUrl || activeQrImage);
+    a.download = `QRIS-${activeMerchantName.replace(/[^a-zA-Z0-9]/g, "-")}.jpg`;
     document.body.appendChild(a);
     a.click();
     document.body.removeChild(a);
@@ -213,10 +233,10 @@ export const BuyerPaymentModal: React.FC<BuyerPaymentModalProps> = ({
             </div>
           )}
 
-          {/* Official QRIS Presentation Frame */}
+          {/* Official QRIS Presentation Frame with Real Standee Photo */}
           <div className="bg-gradient-to-b from-slate-50 to-white border-2 border-slate-200 rounded-2xl overflow-hidden shadow-xs">
             {/* QRIS Official Red Banner */}
-            <div className="bg-red-600 px-4 py-2 text-white flex items-center justify-between">
+            <div className="bg-red-600 px-4 py-2.5 text-white flex items-center justify-between">
               <div className="flex items-center gap-2">
                 <span className="font-extrabold text-sm tracking-wider font-sans">QRIS</span>
                 <span className="text-[10px] bg-white/20 px-1.5 py-0.2 rounded font-mono">
@@ -225,10 +245,10 @@ export const BuyerPaymentModal: React.FC<BuyerPaymentModalProps> = ({
               </div>
               <div className="text-right">
                 <span className="text-[10px] uppercase font-bold tracking-tight block">
-                  {MERCHANT_NAME}
+                  {activeMerchantName}
                 </span>
                 <span className="text-[9px] text-red-100 block font-mono">
-                  NMID: {MERCHANT_NMID}
+                  NMID: {activeNmid} • {activeTerminal}
                 </span>
               </div>
             </div>
@@ -244,26 +264,31 @@ export const BuyerPaymentModal: React.FC<BuyerPaymentModalProps> = ({
               </span>
             </div>
 
-            {/* Sharp QR Code View with Scanning Corner Guides */}
+            {/* Real Official QRIS Standee Photo or Dynamic QR */}
             <div className="flex justify-center my-3 px-4">
-              <div className="relative p-3 bg-white rounded-2xl shadow-sm border border-slate-200">
-                {/* Visual Corner Markers */}
-                <div className="absolute top-1.5 left-1.5 w-3.5 h-3.5 border-t-2 border-l-2 border-emerald-600 rounded-tl-sm" />
-                <div className="absolute top-1.5 right-1.5 w-3.5 h-3.5 border-t-2 border-r-2 border-emerald-600 rounded-tr-sm" />
-                <div className="absolute bottom-1.5 left-1.5 w-3.5 h-3.5 border-b-2 border-l-2 border-emerald-600 rounded-bl-sm" />
-                <div className="absolute bottom-1.5 right-1.5 w-3.5 h-3.5 border-b-2 border-r-2 border-emerald-600 rounded-br-sm" />
-
-                {qrDataUrl ? (
+              <div
+                onClick={() => setIsZoomed(true)}
+                className="relative p-2 bg-white rounded-2xl shadow-sm border-2 border-slate-200 hover:border-emerald-500 cursor-pointer group transition-all text-center max-w-[280px]"
+                title="Klik untuk memperbesar foto QRIS"
+              >
+                <div className="relative overflow-hidden rounded-xl bg-slate-50 flex items-center justify-center">
                   <img
-                    src={qrDataUrl}
-                    alt="QRIS Barcode"
-                    className="w-48 h-48 sm:w-52 sm:h-52 object-contain"
+                    src={shouldUseCustomImage ? activeQrImage : (qrDataUrl || activeQrImage)}
+                    alt={`QRIS ${activeMerchantName}`}
+                    className="w-full max-h-72 object-contain mx-auto transition-transform duration-200 group-hover:scale-102"
                   />
-                ) : (
-                  <div className="w-48 h-48 flex items-center justify-center text-xs text-slate-400">
-                    Memuat Kode QRIS...
+                  <div className="absolute inset-0 bg-slate-900/0 group-hover:bg-slate-900/25 transition-colors flex items-center justify-center">
+                    <span className="opacity-0 group-hover:opacity-100 bg-slate-900/85 text-white text-[11px] font-bold px-3 py-1.5 rounded-full flex items-center gap-1.5 transition-opacity shadow-lg backdrop-blur-xs">
+                      <ZoomIn className="w-3.5 h-3.5 text-emerald-400" />
+                      Klik untuk Perbesar
+                    </span>
                   </div>
-                )}
+                </div>
+
+                <div className="mt-2 text-[10px] text-slate-500 flex items-center justify-center gap-1 font-medium">
+                  <Sparkles className="w-3 h-3 text-emerald-600 shrink-0" />
+                  <span>Foto QRIS Resmi • Dicetak oleh: {activePrinterCode}</span>
+                </div>
               </div>
             </div>
 
@@ -300,15 +325,23 @@ export const BuyerPaymentModal: React.FC<BuyerPaymentModalProps> = ({
               </button>
             </div>
 
-            {/* QR Action Buttons */}
+            {/* QR Action Buttons: Fullscreen Zoom and Save */}
             <div className="px-4 pb-3 flex items-center justify-between gap-2">
               <button
                 type="button"
+                onClick={() => setIsZoomed(true)}
+                className="flex-1 py-2 px-2.5 bg-slate-900 hover:bg-slate-800 text-white text-xs font-bold rounded-xl flex items-center justify-center gap-1.5 transition-colors shadow-xs"
+              >
+                <ZoomIn className="w-3.5 h-3.5 text-emerald-400" />
+                <span>Perbesar QR</span>
+              </button>
+              <button
+                type="button"
                 onClick={handleDownloadQR}
-                className="flex-1 py-2 px-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-medium rounded-xl flex items-center justify-center gap-1.5 transition-colors border border-slate-200"
+                className="flex-1 py-2 px-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-semibold rounded-xl flex items-center justify-center gap-1.5 transition-colors border border-slate-200"
               >
                 <Download className="w-3.5 h-3.5 text-slate-600" />
-                <span>Simpan Gambar QR</span>
+                <span>Simpan Gambar</span>
               </button>
             </div>
 
@@ -318,6 +351,7 @@ export const BuyerPaymentModal: React.FC<BuyerPaymentModalProps> = ({
               <span className="bg-white px-1.5 py-0.5 rounded border border-slate-200">BCA</span>
               <span className="bg-white px-1.5 py-0.5 rounded border border-slate-200">Mandiri</span>
               <span className="bg-white px-1.5 py-0.5 rounded border border-slate-200">BRI</span>
+              <span className="bg-white px-1.5 py-0.5 rounded border border-slate-200">BNI</span>
               <span className="bg-white px-1.5 py-0.5 rounded border border-slate-200">GoPay</span>
               <span className="bg-white px-1.5 py-0.5 rounded border border-slate-200">OVO</span>
               <span className="bg-white px-1.5 py-0.5 rounded border border-slate-200">Dana</span>
@@ -481,6 +515,69 @@ export const BuyerPaymentModal: React.FC<BuyerPaymentModalProps> = ({
           </button>
         </div>
       </div>
+
+      {/* High Resolution Zoomed QR Modal */}
+      {isZoomed && (
+        <div
+          onClick={() => setIsZoomed(false)}
+          className="fixed inset-0 z-60 bg-black/85 backdrop-blur-md flex flex-col items-center justify-center p-3 sm:p-4 animate-in fade-in duration-200"
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            className="relative bg-white p-3.5 sm:p-4 rounded-3xl max-w-sm sm:max-w-md w-full shadow-2xl border border-white/20 text-center animate-in zoom-in-95 duration-150"
+          >
+            <div className="flex items-center justify-between pb-2 mb-2 border-b border-slate-100">
+              <div className="text-left">
+                <h4 className="font-bold text-sm text-slate-900">{activeMerchantName}</h4>
+                <p className="text-[10px] text-slate-500 font-mono">
+                  NMID: {activeNmid} • {activeTerminal}
+                </p>
+              </div>
+              <button
+                onClick={() => setIsZoomed(false)}
+                className="p-1.5 text-slate-400 hover:text-slate-800 rounded-full hover:bg-slate-100 transition-colors"
+                title="Tutup"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="bg-slate-50 rounded-2xl p-1.5 border border-slate-200 overflow-hidden flex justify-center">
+              <img
+                src={shouldUseCustomImage ? activeQrImage : (qrDataUrl || activeQrImage)}
+                alt={`QRIS ${activeMerchantName}`}
+                className="w-full max-h-[60vh] object-contain rounded-xl"
+              />
+            </div>
+
+            <div className="mt-3 pt-2 border-t border-slate-100 flex items-center justify-between gap-2">
+              <div className="text-left">
+                <span className="text-[10px] text-slate-500 block">Total Tagihan:</span>
+                <span className="font-mono font-extrabold text-sm sm:text-base text-emerald-700">
+                  {formatRupiah(totalAmount)}
+                </span>
+              </div>
+              <div className="flex gap-1.5">
+                <button
+                  type="button"
+                  onClick={handleDownloadQR}
+                  className="px-3 py-1.5 bg-slate-900 hover:bg-slate-800 text-white rounded-xl text-xs font-bold flex items-center gap-1.5 transition-colors"
+                >
+                  <Download className="w-3.5 h-3.5" />
+                  <span>Simpan</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setIsZoomed(false)}
+                  className="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-semibold transition-colors"
+                >
+                  Tutup
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

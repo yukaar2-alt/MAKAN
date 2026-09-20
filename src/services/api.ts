@@ -1,4 +1,4 @@
-import { AnalyticsReport, ChatMessage, EmailLog, Order, OrderStatus, Product } from "../types";
+import { AnalyticsReport, ChatMessage, EmailLog, Order, OrderStatus, Product, PaymentQRConfig } from "../types";
 
 const API_BASE = "";
 
@@ -284,6 +284,53 @@ export async function markChatAsRead(customerId: string, reader: "buyer" | "cash
   }
 }
 
+// Payment QRIS APIs
+export async function fetchPaymentQRConfig(): Promise<PaymentQRConfig | null> {
+  try {
+    const res = await fetch(`${API_BASE}/api/payment-qr`);
+    const json = await res.json();
+    return json.success ? json.data : null;
+  } catch (err) {
+    console.error("Failed to fetch payment QR config:", err);
+    return null;
+  }
+}
+
+export async function updatePaymentQRConfig(
+  updates: Partial<PaymentQRConfig>
+): Promise<{ success: boolean; data?: PaymentQRConfig; message?: string }> {
+  try {
+    const res = await fetch(`${API_BASE}/api/payment-qr`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(updates),
+    });
+    const json = await res.json();
+    return json;
+  } catch (err) {
+    console.error("Failed to update payment QR config:", err);
+    return { success: false, message: "Gagal menghubungi server untuk mengubah QRIS" };
+  }
+}
+
+export async function resetPaymentQRConfig(): Promise<{
+  success: boolean;
+  data?: PaymentQRConfig;
+  message?: string;
+}> {
+  try {
+    const res = await fetch(`${API_BASE}/api/payment-qr/reset`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+    });
+    const json = await res.json();
+    return json;
+  } catch (err) {
+    console.error("Failed to reset payment QR config:", err);
+    return { success: false, message: "Gagal mengembalikan QRIS ke default" };
+  }
+}
+
 // Subscribe to real-time events via Server-Sent Events (SSE)
 export function subscribeToEvents(
   onNewOrder: (order: Order) => void,
@@ -292,7 +339,8 @@ export function subscribeToEvents(
   onStockUpdated: (products: Product[]) => void,
   onEmailNotification?: (log: EmailLog) => void,
   onChatMessage?: (msg: ChatMessage) => void,
-  onChatRead?: (data: { customerId: string; reader: string }) => void
+  onChatRead?: (data: { customerId: string; reader: string }) => void,
+  onPaymentQRUpdated?: (config: PaymentQRConfig) => void
 ): () => void {
   let eventSource: EventSource | null = null;
   let isClosed = false;
@@ -357,6 +405,15 @@ export function subscribeToEvents(
           if (onChatRead) {
             const data = JSON.parse(e.data);
             onChatRead(data);
+          }
+        } catch {}
+      });
+
+      eventSource.addEventListener("payment_qr_updated", (e) => {
+        try {
+          if (onPaymentQRUpdated) {
+            const config = JSON.parse(e.data);
+            onPaymentQRUpdated(config);
           }
         } catch {}
       });

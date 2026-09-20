@@ -108,3 +108,14 @@ export interface ChatMessage {
   orderNumber?: string;
   isRead?: boolean;
 }
+
+export interface PaymentQRConfig {
+  imageUrl: string;
+  merchantName: string;
+  merchantCity: string;
+  nmid: string;
+  terminal: string;
+  printerCode: string;
+  useCustomImage: boolean;
+  updatedAt: string;
+}

@@ -182,9 +182,9 @@ export const ReceiptModal: React.FC<ReceiptModalProps> = ({
                 MAKAN SANTAI
               </h4>
               <p className="text-[10px] text-slate-600 mt-0.5">
-                
+                Jl. Johari Raya No. 9, Kebayoran Lama, Jakarta Selatan
               </p>
-              <p className="text-[10px] text-slate-600">Telp: 0812-3456-7890</p>
+              <p className="text-[10px] text-slate-600">Telp: 0856-2408-6661</p>
             </div>
 
             <div className="my-2 border-t-2 border-black border-dashed"></div>

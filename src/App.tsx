@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from "react";
-import { GoogleUser, Product, CartItem, Order, OrderStatus, AnalyticsReport, ChatMessage } from "./types";
+import { GoogleUser, Product, CartItem, Order, OrderStatus, AnalyticsReport, ChatMessage, PaymentQRConfig } from "./types";
 import {
   fetchProducts,
   fetchOrders,
@@ -11,6 +11,7 @@ import {
   createProduct,
   subscribeToEvents,
   fetchChatMessages,
+  fetchPaymentQRConfig,
 } from "./services/api";
 import { playCashierAlertChime, requestBrowserNotification } from "./utils/audio";
 import { Header } from "./components/common/Header";
@@ -26,6 +27,7 @@ import { CashierStockManager } from "./components/cashier/CashierStockManager";
 import { CashierReports } from "./components/cashier/CashierReports";
 import { CashierEmailCenter } from "./components/cashier/CashierEmailCenter";
 import { CashierLiveChat } from "./components/cashier/CashierLiveChat";
+import { CashierQRManager } from "./components/cashier/CashierQRManager";
 import {
   UtensilsCrossed,
   Receipt,
@@ -36,6 +38,7 @@ import {
   ChefHat,
   CheckCircle2,
   MessageSquare,
+  QrCode,
 } from "lucide-react";
 
 export default function App() {
@@ -61,7 +64,7 @@ export default function App() {
 
   // Cashier State
   const [isCashierUnlocked, setIsCashierUnlocked] = useState<boolean>(false);
-  const [cashierActiveTab, setCashierActiveTab] = useState<"orders" | "stock" | "reports" | "email" | "chat">("orders");
+  const [cashierActiveTab, setCashierActiveTab] = useState<"orders" | "stock" | "reports" | "email" | "chat" | "qris">("orders");
   const [selectedChatCustomerId, setSelectedChatCustomerId] = useState<string | undefined>(undefined);
   const [audioAlertEnabled, setAudioAlertEnabled] = useState<boolean>(true);
 
@@ -69,6 +72,7 @@ export default function App() {
   const [products, setProducts] = useState<Product[]>([]);
   const [orders, setOrders] = useState<Order[]>([]);
   const [chatMessages, setChatMessages] = useState<ChatMessage[]>([]);
+  const [paymentQRConfig, setPaymentQRConfig] = useState<PaymentQRConfig | null>(null);
   const [analytics, setAnalytics] = useState<AnalyticsReport | null>(null);
   const [toastMessage, setToastMessage] = useState<{ type: "success" | "info"; text: string } | null>(null);
 
@@ -79,16 +83,20 @@ export default function App() {
 
   // Load initial data
   const loadInitialData = useCallback(async () => {
-    const [prods, ords, an, chats] = await Promise.all([
+    const [prods, ords, an, chats, qrCfg] = await Promise.all([
       fetchProducts(),
       fetchOrders(),
       fetchAnalytics(),
       fetchChatMessages(),
+      fetchPaymentQRConfig(),
     ]);
     setProducts(prods);
     setOrders(ords);
     setAnalytics(an);
     setChatMessages(chats);
+    if (qrCfg) {
+      setPaymentQRConfig(qrCfg);
+    }
   }, []);
 
   useEffect(() => {
@@ -170,6 +178,11 @@ export default function App() {
             return m;
           })
         );
+      },
+      // onPaymentQRUpdated
+      (updatedConfig: PaymentQRConfig) => {
+        setPaymentQRConfig(updatedConfig);
+        showToast("QRIS Pembayaran toko telah diperbarui secara real-time", "info");
       }
     );
 
@@ -427,6 +440,7 @@ export default function App() {
                     cartItems={cartItems}
                     orderType={checkoutOptions.orderType}
                     tableNumber={checkoutOptions.tableNumber}
+                    paymentQRConfig={paymentQRConfig}
                     onClose={() => setIsPaymentModalOpen(false)}
                     onSubmitOrder={handleSubmitOrder}
                   />
@@ -531,6 +545,19 @@ export default function App() {
                       <Mail className="w-4 h-4 text-emerald-400" />
                       <span>Email Admin</span>
                     </button>
+
+                    <button
+                      id="cashier-tab-qris-btn"
+                      onClick={() => setCashierActiveTab("qris")}
+                      className={`flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-bold transition-all shrink-0 ${
+                        cashierActiveTab === "qris"
+                          ? "bg-slate-900 text-white shadow-xs"
+                          : "text-slate-700 hover:bg-slate-100"
+                      }`}
+                    >
+                      <QrCode className="w-4 h-4 text-emerald-400" />
+                      <span>QR Pembayaran</span>
+                    </button>
                   </div>
 
                   <div className="text-[11px] text-slate-500 font-mono hidden md:block">
@@ -572,6 +599,13 @@ export default function App() {
                 )}
 
                 {cashierActiveTab === "email" && <CashierEmailCenter />}
+
+                {cashierActiveTab === "qris" && (
+                  <CashierQRManager
+                    currentConfig={paymentQRConfig}
+                    onConfigUpdated={(newCfg) => setPaymentQRConfig(newCfg)}
+                  />
+                )}
               </div>
             )}
           </>

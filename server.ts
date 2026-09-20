@@ -179,6 +179,30 @@ let chatMessages: ChatMessage[] = [
 let cashierPin = "200310";
 let currentAdminEmail = "ibeywy@gmail.com";
 
+interface PaymentQRConfig {
+  imageUrl: string;
+  merchantName: string;
+  merchantCity: string;
+  nmid: string;
+  terminal: string;
+  printerCode: string;
+  useCustomImage: boolean;
+  updatedAt: string;
+}
+
+const defaultPaymentQR: PaymentQRConfig = {
+  imageUrl: "/qris_makan_santai.jpg",
+  merchantName: "MAKAN SANTAI, KBYRN LM",
+  merchantCity: "KBYRN LM",
+  nmid: "ID1026597604283",
+  terminal: "A01",
+  printerCode: "93600914",
+  useCustomImage: true,
+  updatedAt: new Date().toISOString(),
+};
+
+let paymentQRConfig: PaymentQRConfig = { ...defaultPaymentQR };
+
 // Server-Sent Events subscribers for real-time cashier notifications
 type SSESubscriber = (event: string, data: any) => void;
 const sseClients: Set<SSESubscriber> = new Set();
@@ -232,8 +256,8 @@ async function startServer() {
   const app = express();
   const PORT = 3000;
 
-  app.use(express.json({ limit: "15mb" })); // Support base64 upload of payment receipts
-  app.use(express.urlencoded({ extended: true, limit: "15mb" }));
+  app.use(express.json({ limit: "30mb" })); // Support base64 upload of payment receipts & QR codes
+  app.use(express.urlencoded({ extended: true, limit: "30mb" }));
 
   // --- API ROUTES ---
 
@@ -304,6 +328,55 @@ async function startServer() {
     }
     cashierPin = newPin;
     res.json({ success: true, message: "PIN Kasir Berhasil Diperbarui" });
+  });
+
+  // --- Payment QRIS Configuration Routes ---
+  app.get("/api/payment-qr", (_req, res) => {
+    res.json({ success: true, data: paymentQRConfig });
+  });
+
+  app.post("/api/payment-qr", (req, res) => {
+    const {
+      imageUrl,
+      merchantName,
+      merchantCity,
+      nmid,
+      terminal,
+      printerCode,
+      useCustomImage,
+    } = req.body;
+
+    paymentQRConfig = {
+      ...paymentQRConfig,
+      imageUrl: imageUrl !== undefined ? imageUrl : paymentQRConfig.imageUrl,
+      merchantName: merchantName !== undefined ? merchantName : paymentQRConfig.merchantName,
+      merchantCity: merchantCity !== undefined ? merchantCity : paymentQRConfig.merchantCity,
+      nmid: nmid !== undefined ? nmid : paymentQRConfig.nmid,
+      terminal: terminal !== undefined ? terminal : paymentQRConfig.terminal,
+      printerCode: printerCode !== undefined ? printerCode : paymentQRConfig.printerCode,
+      useCustomImage: useCustomImage !== undefined ? Boolean(useCustomImage) : paymentQRConfig.useCustomImage,
+      updatedAt: new Date().toISOString(),
+    };
+
+    broadcastEvent("payment_qr_updated", paymentQRConfig);
+    res.json({
+      success: true,
+      data: paymentQRConfig,
+      message: "QRIS Pembayaran berhasil diperbarui dan diterapkan ke semua pelanggan",
+    });
+  });
+
+  app.post("/api/payment-qr/reset", (_req, res) => {
+    paymentQRConfig = {
+      ...defaultPaymentQR,
+      updatedAt: new Date().toISOString(),
+    };
+    broadcastEvent("payment_qr_updated", paymentQRConfig);
+    res.json({
+      success: true,
+      data: paymentQRConfig,
+      message: "Foto dan konfigurasi QRIS berhasil dikembalikan ke standar awal",
+    });
   });
 
   // Get orders (optional filter by customerId for Buyer isolation)

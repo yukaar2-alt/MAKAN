@@ -1,8 +1,11 @@
 import QRCode from "qrcode";
 
-export const MERCHANT_NAME = "MAKAN SANTAI";
-export const MERCHANT_CITY = "JAKARTA";
-export const MERCHANT_NMID = "ID1020249876543";
+export const MERCHANT_NAME = "MAKAN SANTAI, KBYRN LM";
+export const MERCHANT_CITY = "KBYRN LM";
+export const MERCHANT_NMID = "ID1026597604283";
+export const MERCHANT_A01 = "A01";
+export const MERCHANT_PRINTER_CODE = "93600914";
+export const QRIS_STAND_PHOTO = "/qris_makan_santai.jpg";
 
 // Generate standard QRIS payload string
 export function generateQRISPayload(amount: number, orderNumber: string): string {
